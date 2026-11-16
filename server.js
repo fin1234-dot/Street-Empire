@@ -24,6 +24,12 @@ const server = http.createServer(async (req, res) => {
     req.on("close", () => { clients.delete(res); clearInterval(ka); });
     return;
   }
+  if (u.pathname === "/api/sync" && req.method === "POST") {
+    const b = await readBody(req), now = Date.now();
+    if (typeof b.id === "string" && b.id.length < 64 && b.state && typeof b.state === "object") players.set(b.id, { s: b.state, t: now });
+    const out = {}; for (const [k, p] of players) if (k !== b.id && now - p.t < 8000) out[k] = p.s;
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }); return res.end(JSON.stringify({ players: out }));
+  }
   if (u.pathname === "/api/presence" && req.method === "POST") {
     const b = await readBody(req);
     if (typeof b.id === "string" && b.id.length < 64 && b.state && typeof b.state === "object") { players.set(b.id, { s: b.state, t: Date.now() }); broadcast({ id: b.id, presence: b.state }); }
