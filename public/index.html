@@ -6,11 +6,10 @@
 /* Self-hosted online layer: replaces the Claude runtime with this site's own server */
 (function(){var id=localStorage.getItem("se_id");if(!id){id=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem("se_id",id)}
 var pid=sessionStorage.getItem("se_pid");if(!pid){pid=Math.random().toString(36).slice(2)+Date.now().toString(36);sessionStorage.setItem("se_pid",pid)}
-var peers=new Map(),me={},dirty=false,lastSend=0,es=null,ok=false;
-function connect(){return new Promise(function(res){try{es=new EventSource("/api/events");es.onopen=function(){ok=true;res(true)};es.onerror=function(){if(!ok)res(false)};
- es.onmessage=function(e){var m=JSON.parse(e.data);if(m.gone)peers.delete(m.id);else if(m.id!==pid)peers.set(m.id,m.presence)}}catch(e){res(false)}})}
-setInterval(function(){var now=performance.now();if(!ok)return;if(dirty||now-lastSend>2000){dirty=false;lastSend=now;fetch("/api/presence",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:pid,state:me})}).catch(function(){})}},66);
-var room={presence:function(p){Object.assign(me,p);dirty=true;return Promise.resolve()},
+var peers=new Map(),me={},ok=false,busy=false;
+async function sync(){if(busy)return false;busy=true;try{var r=await fetch("/api/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:pid,state:me})});if(!r.ok)throw 0;var j=await r.json();peers.clear();for(var k in j.players)if(k!==pid)peers.set(k,j.players[k]);ok=true;busy=false;return true}catch(e){busy=false;return false}}
+function connect(){return sync().then(function(good){if(good)setInterval(sync,100);return good})}
+var room={presence:function(p){Object.assign(me,p);return Promise.resolve()},
  peers:function(){var a=[{peer:pid,isMe:true,sameTab:true,presence:me}];peers.forEach(function(v,k){a.push({peer:k,isMe:false,sameTab:false,presence:v})});return a}};
 window.claude={use:async function(n){
  if(n==="room")return (await connect())?room:null;
@@ -104,7 +103,7 @@ setTimeout(function(){if(!window.THREE){var e=document.getElementById("lt");if(e
 <script>window.onerror=function(m,s,l){var e=document.getElementById('err');e.style.display='block';e.textContent='Error: '+m+' (line '+l+')'}</script>
 <div class="hud" id="hud"><span id="pos"></span><span id="lap"></span><span id="spd"></span></div>
 <button id="gbtn">Garage (G)</button><button id="mapbtn">Map (M)</button><canvas id="mm" width="300" height="300"></canvas>
-<div class="big hide" id="big"></div><div id="drift"></div><div id="net"></div><div id="fl"></div><div id="sl"></div><div id="nbar"><i id="nbi"></i></div><div id="tm"></div><button id="nbtn">NITRO</button><button id="mute">\ud83d\udd0a</button><button id="mbtn">Missions (K)</button><div class="panel hide" id="ms"></div><button id="qbtn">Graphics: High</button><div id="bars"><i></i><i></i></div><div id="crash"></div><button id="tbtn" class="hide">Transform (T)</button><button id="jbtn" class="hide">Jump (J)</button><canvas id="spdo" width="260" height="170"></canvas>
+<div class="big hide" id="big"></div><div id="drift"></div><div id="net"></div><div id="fl"></div><div id="sl"></div><div id="nbar"><i id="nbi"></i></div><div id="tm"></div><button id="nbtn">NITRO</button><button id="mute">🔊</button><button id="mbtn">Missions (K)</button><div class="panel hide" id="ms"></div><button id="qbtn">Graphics: High</button><div id="bars"><i></i><i></i></div><div id="crash"></div><button id="tbtn" class="hide">Transform (T)</button><button id="jbtn" class="hide">Jump (J)</button><canvas id="spdo" width="260" height="170"></canvas>
 <div class="tip" id="tip">Press M for the map · Drive into a glowing gate to race · Brake before corners!</div>
 <div class="panel hide" id="garage"></div>
 <div class="panel hide" id="done"></div><div class="panel hide" id="mapp"></div><div class="panel hide" id="rm"></div><button id="dev" class="hide">Dev</button><button id="cbtn">Camera (C)</button><button id="sbtn">Shop (U)</button><div class="panel hide" id="shop"></div><div id="camn"></div><div class="panel hide" id="devp"></div>
